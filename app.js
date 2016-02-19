@@ -7,7 +7,9 @@ var MongoClient = mongodb.MongoClient;
 var mongoose = require('mongoose');
 var url = require('url');
 var validUrl = require('valid-url');
-var testUrl = "";
+var request = require('request');
+var short = require('short');
+var shortUrl = {real: 'http://www.yahoo.com', short: 'https://url-shortener-ymarks.c9users.io/1'};
 function checkUrl(address){
     var urlChop = address.href.slice(1);
     var validUrl = require('valid-url');
@@ -21,21 +23,40 @@ function checkUrl(address){
         return urlChop;
     }
    }
-
-function realUrl(result, req, res) {
-    var request = require('request');
-    request(result, function (error, response, body){
-       if(!error && response.statusCode == 200){
-           console.log("This URL is real!");
-           return result;
-       }else{
-           console.log("Not a real URL");      
-           
-           return "Not a valid URL";
-       } 
-    });
+function checkDB(address){
+    MongoClient.connect('mongodb://velma:&inkies101@ds049848.mongolab.com:49848/urlshortened', function(err, db){
+    if(err){
+        console.log("The error is " + err);
+    }else{
+        console.log("Huzzah, we are connected!");
+        var shortUrls = db.collection('shortUrls');
+        //var shortUrl1 = {real: "http://www.yahoo.com", short: 'https://url-shortener-ymarks.c9users.io/1'};
+        shortUrls.insert(
+            shortUrl,
+            function(err, data){
+                if(err){
+                    console.log(err);
+                }});
+            
     
-}   
+    console.log("We are looking for " + address);
+   
+    shortUrls.find({
+        real: {address}
+    }).toArray(function(err, docs){
+        if(err){
+            console.log(err);
+            db.close();
+        }
+        console.log(docs);
+        db.close();
+    }); 
+    
+    }
+}
+        
+    )}
+
 var server = http.createServer(function (req, res){
     var origUrl = url.parse(req.url, true);
     var result = checkUrl(origUrl);
@@ -43,21 +64,23 @@ var server = http.createServer(function (req, res){
     if(result == "Not a valid URL"){
       var html = "<p>"+ result + "</p>";
     }else{
-        var html = "<p>"+ result + "</p>";
-        testUrl = realUrl(result);
-        console.log("testUrl " + testUrl);
+         
+         request(result, function (error, response, body){
+       if(!error && response.statusCode == 200){
+           console.log("This URL is real!");
+            checkDB(result); 
+           
+       }else{
+           result = "Not a valid URL";
+           console.log("result is " + result);
+         
+       } 
+    });
     }
-    //var html = "<p>" + result + "</p>";
-    MongoClient.connect('mongodb://velma:&inkies101@ds049848.mongolab.com:49848/urlshortened', function(err, db){
-    if(err){
-        console.log("The error is " + err);
-    }else{
-        console.log("Huzzah, we are connected!");
-    }
-    //var shortUrls = db.collection('shortUrls');
-   
-    db.close();
+    
+    
+    var html = "<p>"+ result + "</p>";
     res.end(html);
 });
-});
+
 server.listen(port);
